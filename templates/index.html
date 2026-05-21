@@ -1,0 +1,803 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chess Engine - GUI</title>
+
+    <!-- jQuery (required by chessboard.js) -->
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+
+    <!-- chessboard.js CSS & JS -->
+    <link rel="stylesheet"
+          href="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.css">
+    <script src="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.js"></script>
+
+    <!-- chess.js (client-side move validation) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="/static/css/style.css">
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+
+    <div class="app-container">
+        <!-- Header -->
+        <header class="header">
+            <div class="logo">
+                <span class="logo-icon">♚</span>
+                <h1>Chess Engine</h1>
+            </div>
+            <div class="turn-badge" id="turnBadge">
+                <span class="turn-dot"></span>
+                <span id="turnText">Turn: White</span>
+            </div>
+        </header>
+
+        <!-- Main content -->
+        <div class="main-content">
+            <!-- Board container -->
+            <div class="board-wrapper" style="position: relative;">
+                <!-- Bot Trash Talk Bubble -->
+                <div id="trashTalkBubble" class="trash-talk-bubble hidden">
+                    <span class="trash-talk-avatar">♟</span>
+                    <span id="trashTalkText" class="trash-talk-text"></span>
+                </div>
+                
+                <div id="chessBoard" class="board-inner"></div>
+            </div>
+
+            <!-- Side panel -->
+            <div class="side-panel">
+                <!-- Status card -->
+                <div class="card status-card">
+                    <h3>Status</h3>
+                    <p id="statusText" class="status-text">Game started. Make your move!</p>
+                </div>
+
+                <!-- Move history card -->
+                <div class="card history-card">
+                    <h3>Move History</h3>
+                    <div id="moveHistory" class="move-history">
+                        <span class="empty-history">No moves yet...</span>
+                    </div>
+                </div>
+
+                <!-- Buttons -->
+                <div class="button-group">
+                    <button id="undoBtn" class="btn btn-secondary" onclick="undoMove()">
+                        ↩ Undo
+                    </button>
+                    <button id="resetBtn" class="btn btn-danger" onclick="resetGame()">
+                        New Game
+                    </button>
+                    <button id="flipBtn" class="btn btn-accent" onclick="flipBoard()">
+                        Flip Board
+                    </button>
+                </div>
+
+                <!-- Color picker -->
+                <div class="button-group" style="margin-top: 8px;">
+                    <button id="playWhiteBtn" class="btn btn-secondary" onclick="setPlayerColor('w')" style="flex:1;">
+                        ♔ Play White
+                    </button>
+                    <button id="playBlackBtn" class="btn btn-secondary" onclick="setPlayerColor('b')" style="flex:1;">
+                        ♚ Play Black
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Game Over Overlay -->
+    <div id="gameOverOverlay" class="overlay hidden">
+        <div class="overlay-content">
+            <h2 id="gameOverTitle">Game Over!</h2>
+            <p id="gameOverResult"></p>
+            <button class="btn btn-primary" onclick="resetGame()">New Game</button>
+        </div>
+    </div>
+
+    <script>
+        // =========================================================
+        //  Chess.js (client-side state)
+        // =========================================================
+        var game = new Chess();
+        var moveCount = 0;
+
+        // =========================================================
+        //  State for click-to-move & highlights
+        // =========================================================
+        var selectedSquare = null;   // square name like 'e2'
+        var lastMoveFrom = null;     // last move origin
+        var lastMoveTo = null;       // last move destination
+        var lastMoveWasCapture = false; // track for sound
+
+        // Premove state
+        var waitingForBot = false;   // true while waiting for server/bot response
+        var premoveQueue = [];       // array of {from, to} premoves
+        var playerColor = 'w';       // 'w' or 'b' — which color the human plays
+
+        // =========================================================
+        //  Trash Talk messages
+        // =========================================================
+        // Bot captures your piece (bot taunts you)
+        var botCaptureTrash = [
+            "qfar botiii eyyy",
+            "IQ 20?",
+            "what is this bordher",
+            "Really!!!",
+            "Smu lujka hiq",
+            "Kallxom kur ja nis me lu",
+            "sdi sdi qesi noobi skom pa"
+        ];
+
+        // You capture bot's piece (bot is sarcastic / coping)
+        var playerCaptureTrash = [
+            "hahah IQ++",
+            "Ta lshova qeta",
+            "Thash mos po kan, vet dashta me ta lan",
+            "uuu manfund e gjeti qe sa ta kom fal",
+            "yess, u fall for it",
+            "Po menon qe ke fal a",
+            "Maju qetasthi"
+        ];
+
+        var trashTalkTimer = null;
+        var lastTrashMsg = {};
+
+        function showTrashTalk(messages) {
+            var bubble = document.getElementById('trashTalkBubble');
+            var text = document.getElementById('trashTalkText');
+            
+            // Avoid repeating the same message twice in a row
+            var availableMsgs = messages;
+            if (messages.length > 1 && lastTrashMsg[messages]) {
+                availableMsgs = messages.filter(function(m) { return m !== lastTrashMsg[messages]; });
+            }
+            var msg = availableMsgs[Math.floor(Math.random() * availableMsgs.length)];
+            lastTrashMsg[messages] = msg;
+
+            text.textContent = msg;
+            bubble.classList.remove('hidden', 'trash-talk-out');
+            bubble.classList.add('trash-talk-in');
+
+            // Clear any existing timer
+            if (trashTalkTimer) clearTimeout(trashTalkTimer);
+
+            // Fade out after 3 seconds
+            trashTalkTimer = setTimeout(function() {
+                bubble.classList.remove('trash-talk-in');
+                bubble.classList.add('trash-talk-out');
+                setTimeout(function() {
+                    bubble.classList.add('hidden');
+                }, 400);
+            }, 3000);
+        }
+
+        // =========================================================
+        //  Audio — gentle move & capture sounds via Web Audio API
+        // =========================================================
+        var audioCtx = null;
+
+        function ensureAudioCtx() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+            return audioCtx;
+        }
+
+        // Normal move: gentle, soft tap
+        function playMoveSound() {
+            try {
+                var ctx = ensureAudioCtx();
+                var t = ctx.currentTime;
+                var osc = ctx.createOscillator();
+                var gain = ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(220, t);
+                osc.frequency.exponentialRampToValueAtTime(120, t + 0.12);
+                gain.gain.setValueAtTime(0.12, t);
+                gain.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.start(t);
+                osc.stop(t + 0.12);
+            } catch (e) { /* fail silently */ }
+        }
+
+        // Capture: slightly brighter, still soft
+        function playCaptureSound() {
+            try {
+                var ctx = ensureAudioCtx();
+                var t = ctx.currentTime;
+                // A gentle double-tap feel
+                var osc1 = ctx.createOscillator();
+                var gain1 = ctx.createGain();
+                osc1.type = 'sine';
+                osc1.frequency.setValueAtTime(330, t);
+                osc1.frequency.exponentialRampToValueAtTime(160, t + 0.09);
+                gain1.gain.setValueAtTime(0.14, t);
+                gain1.gain.exponentialRampToValueAtTime(0.001, t + 0.09);
+                osc1.connect(gain1);
+                gain1.connect(ctx.destination);
+                osc1.start(t);
+                osc1.stop(t + 0.09);
+
+                // Second softer tap
+                var osc2 = ctx.createOscillator();
+                var gain2 = ctx.createGain();
+                osc2.type = 'sine';
+                osc2.frequency.setValueAtTime(260, t + 0.06);
+                osc2.frequency.exponentialRampToValueAtTime(130, t + 0.15);
+                gain2.gain.setValueAtTime(0.08, t + 0.06);
+                gain2.gain.exponentialRampToValueAtTime(0.001, t + 0.15);
+                osc2.connect(gain2);
+                gain2.connect(ctx.destination);
+                osc2.start(t + 0.06);
+                osc2.stop(t + 0.15);
+            } catch (e) { /* fail silently */ }
+        }
+
+        // Play the right sound based on whether it was a capture
+        function playChessSound(isCapture) {
+            if (isCapture) {
+                playCaptureSound();
+            } else {
+                playMoveSound();
+            }
+        }
+
+        // =========================================================
+        //  Piece image mapping: wK -> king-w.svg, etc.
+        // =========================================================
+        function pieceThemeFn(piece) {
+            var nameMap = {
+                'K': 'king', 'Q': 'queen', 'R': 'rook',
+                'B': 'bishop', 'N': 'knight', 'P': 'pawn'
+            };
+            var color = piece[0] === 'w' ? 'w' : 'b';
+            var type = nameMap[piece[1]];
+            return '/static/img/' + type + '-' + color + '.svg';
+        }
+
+        // =========================================================
+        //  Chessboard.js config
+        // =========================================================
+        var boardConfig = {
+            draggable: true,
+            position: 'start',
+            pieceTheme: pieceThemeFn,
+            onDragStart: onDragStart,
+            onDrop: onDrop,
+            onSnapEnd: onSnapEnd,
+            onMouseoutSquare: onMouseoutSquare,
+            onMouseoverSquare: onMouseoverSquare
+        };
+
+        var chessboard = Chessboard('chessBoard', boardConfig);
+
+        // Responsive board size
+        $(window).resize(function() {
+            chessboard.resize();
+            // Re-apply highlights after resize
+            applyBoardHighlights();
+        });
+
+        // =========================================================
+        //  Highlight helpers
+        // =========================================================
+
+        // Remove ALL custom highlights (dots, selection, last-move, premove)
+        function clearAllHighlights() {
+            $('#chessBoard .square-55d63').removeClass(
+                'highlight-selected highlight-lastmove-from highlight-lastmove-to highlight-legal-dot highlight-premove-from highlight-premove-to'
+            );
+            // Remove dot overlays
+            $('#chessBoard .legal-dot').remove();
+        }
+
+        // Apply persistent highlights (last move, selected square, legal dots, premoves)
+        function applyBoardHighlights() {
+            // Clear everything first
+            clearAllHighlights();
+
+            // 1. Last-move highlights
+            if (lastMoveFrom) {
+                $('#chessBoard .square-' + lastMoveFrom).addClass('highlight-lastmove-from');
+            }
+            if (lastMoveTo) {
+                $('#chessBoard .square-' + lastMoveTo).addClass('highlight-lastmove-to');
+            }
+
+            // 2. Premove highlights (red) — all queued premoves
+            premoveQueue.forEach(function(pm) {
+                $('#chessBoard .square-' + pm.from).addClass('highlight-premove-from');
+                $('#chessBoard .square-' + pm.to).addClass('highlight-premove-to');
+            });
+
+            // 3. Selected square + legal dots
+            if (selectedSquare) {
+                $('#chessBoard .square-' + selectedSquare).addClass('highlight-selected');
+                drawLegalDots(selectedSquare);
+            }
+        }
+
+        // Draw small gray dots on legal destination squares
+        function drawLegalDots(square) {
+            var moves = game.moves({ square: square, verbose: true });
+            moves.forEach(function(m) {
+                var $sq = $('#chessBoard .square-' + m.to);
+                // Add a dot overlay
+                if ($sq.find('.legal-dot').length === 0) {
+                    var isCapture = m.captured || (game.get(m.to) !== null);
+                    if (isCapture) {
+                        // Ring indicator for captures
+                        $sq.append('<div class="legal-dot legal-dot-capture"></div>');
+                    } else {
+                        $sq.append('<div class="legal-dot"></div>');
+                    }
+                }
+            });
+        }
+
+        // =========================================================
+        //  Click-to-move: listen for clicks on the board squares
+        // =========================================================
+        $(document).on('click', '#chessBoard .square-55d63', function() {
+            if (game.game_over()) return;
+
+            var squareEl = $(this);
+            var sqClass = squareEl.attr('class').match(/square-([a-h][1-8])/);
+            if (!sqClass) return;
+            var clickedSquare = sqClass[1];
+
+            // --- PREMOVE MODE: while waiting for bot ---
+            if (waitingForBot) {
+                var piece = game.get(clickedSquare);
+
+                if (!selectedSquare) {
+                    // Select player's piece to start a new premove
+                    if (piece && piece.color === playerColor) {
+                        selectedSquare = clickedSquare;
+                        applyBoardHighlights();
+                    } else {
+                        // Clicking on empty/opponent square with nothing selected:
+                        // cancel all premoves if any exist
+                        if (premoveQueue.length > 0) {
+                            premoveQueue = [];
+                            applyBoardHighlights();
+                            updateStatus('Premoves cancelled', 'info');
+                        }
+                    }
+                    return;
+                }
+
+                // Deselect if clicking the same square
+                if (selectedSquare === clickedSquare) {
+                    selectedSquare = null;
+                    applyBoardHighlights();
+                    return;
+                }
+
+                // Re-select if clicking another own piece
+                if (piece && piece.color === playerColor) {
+                    selectedSquare = clickedSquare;
+                    applyBoardHighlights();
+                    return;
+                }
+
+                // Queue the premove
+                premoveQueue.push({ from: selectedSquare, to: clickedSquare });
+                selectedSquare = null;
+                applyBoardHighlights();
+                updateStatus('Premoves queued: ' + premoveQueue.length, 'warning');
+                return;
+            }
+
+            // --- NORMAL MODE ---
+            var piece = game.get(clickedSquare);
+
+            if (!selectedSquare) {
+                if (piece && piece.color === game.turn()) {
+                    selectedSquare = clickedSquare;
+                    applyBoardHighlights();
+                }
+                return;
+            }
+
+            if (selectedSquare === clickedSquare) {
+                selectedSquare = null;
+                applyBoardHighlights();
+                return;
+            }
+
+            if (piece && piece.color === game.turn()) {
+                selectedSquare = clickedSquare;
+                applyBoardHighlights();
+                return;
+            }
+
+            var move = game.move({
+                from: selectedSquare,
+                to: clickedSquare,
+                promotion: 'q'
+            });
+
+            if (move === null) {
+                selectedSquare = null;
+                applyBoardHighlights();
+                return;
+            }
+
+            lastMoveWasCapture = !!move.captured;
+            var fromSq = selectedSquare;
+            selectedSquare = null;
+            clearAllHighlights();
+
+            playChessSound(lastMoveWasCapture);
+
+            chessboard.position(game.fen());
+
+            sendMoveToServer(fromSq, clickedSquare);
+        });
+
+        // =========================================================
+        //  Drag-and-drop handlers
+        // =========================================================
+        function onDragStart(source, piece, position, orientation) {
+            if (game.game_over()) return false;
+
+            // While waiting for bot, allow dragging own pieces for premove
+            if (waitingForBot) {
+                var pieceColor = piece[0]; // 'w' or 'b'
+                if (pieceColor === playerColor) {
+                    selectedSquare = source;
+                    applyBoardHighlights();
+                    return true;
+                }
+                return false;
+            }
+
+            // Normal mode: don't allow moving opponent's pieces
+            if ((game.turn() === 'w' && piece.search(/^b/) !== -1) ||
+                (game.turn() === 'b' && piece.search(/^w/) !== -1)) {
+                return false;
+            }
+
+            selectedSquare = source;
+            applyBoardHighlights();
+        }
+
+        function onDrop(source, target) {
+            selectedSquare = null;
+            clearAllHighlights();
+
+            // --- PREMOVE via drag ---
+            if (waitingForBot) {
+                if (source !== target) {
+                    premoveQueue.push({ from: source, to: target });
+                    applyBoardHighlights();
+                    updateStatus('Premoves queued: ' + premoveQueue.length, 'warning');
+                }
+                return 'snapback';
+            }
+
+            // --- Normal move ---
+            var move = game.move({
+                from: source,
+                to: target,
+                promotion: 'q'
+            });
+
+            if (move === null) {
+                applyBoardHighlights();
+                return 'snapback';
+            }
+
+            lastMoveWasCapture = !!move.captured;
+
+            playChessSound(lastMoveWasCapture);
+
+            sendMoveToServer(source, target);
+        }
+
+        function onSnapEnd() {
+            chessboard.position(game.fen());
+            applyBoardHighlights();
+        }
+
+        function onMouseoverSquare(square, piece) {
+            // When hovering while dragging, chessboard.js handles it
+            // We don't need extra hover highlights
+        }
+
+        function onMouseoutSquare(square, piece) {
+            // Nothing needed here
+        }
+
+        // =========================================================
+        //  Server communication (UNCHANGED API contract)
+        // =========================================================
+        function sendMoveToServer(source, target) {
+            waitingForBot = true;
+
+            fetch('/move', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    source: source,
+                    target: target,
+                    promotion: 'q'
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                waitingForBot = false;
+
+                if (data.valid) {
+                    moveCount++;
+                    addMoveToHistory(source, target);
+
+                    lastMoveFrom = source;
+                    lastMoveTo = target;
+
+                    if (data.bot_move) {
+                        var botFrom = data.bot_move.substring(0, 2);
+                        var botTo = data.bot_move.substring(2, 4);
+                        var botPromo = data.bot_move.length > 4 ? data.bot_move[4] : undefined;
+
+                        var botMoveObj = game.move({
+                            from: botFrom,
+                            to: botTo,
+                            promotion: botPromo
+                        });
+
+                        if (botMoveObj) {
+                            moveCount++;
+                            addMoveToHistory(botFrom, botTo);
+
+                            lastMoveFrom = botFrom;
+                            lastMoveTo = botTo;
+                        }
+                    }
+
+                    game.load(data.fen);
+                    chessboard.position(data.fen, false);
+                    updateTurn(data.turn);
+
+                    // Play sound for the bot's move
+                    if (data.bot_move && botMoveObj) {
+                        playChessSound(!!botMoveObj.captured);
+
+                        // Trash talk on captures
+                        if (botMoveObj.captured) {
+                            // Bot captured player's piece — taunt
+                            showTrashTalk(botCaptureTrash);
+                        }
+                    }
+
+                    // Player captured bot's piece — sarcastic cope
+                    if (lastMoveWasCapture) {
+                        showTrashTalk(playerCaptureTrash);
+                    }
+
+                    if (data.is_check) {
+                        updateStatus('Check!', 'warning');
+                    } else if (data.bot_move) {
+                        updateStatus('Bot played: ' + data.bot_move, 'info');
+                    } else {
+                        updateStatus('Move accepted', 'success');
+                    }
+
+                    if (data.game_over) {
+                        premoveQueue = [];
+                        applyBoardHighlights();
+                        showGameOver(data.result);
+                        return;
+                    }
+
+                    // --- Execute next premove from the queue ---
+                    if (premoveQueue.length > 0) {
+                        var pm = premoveQueue.shift();
+
+                        var premove = game.move({
+                            from: pm.from,
+                            to: pm.to,
+                            promotion: 'q'
+                        });
+
+                        if (premove) {
+                            lastMoveWasCapture = !!premove.captured;
+                            playChessSound(lastMoveWasCapture);
+                            chessboard.position(game.fen());
+                            applyBoardHighlights();
+                            sendMoveToServer(pm.from, pm.to);
+                            return;
+                        } else {
+                            // Premove was illegal — cancel entire queue
+                            premoveQueue = [];
+                            updateStatus('Premove cancelled (illegal)', 'error');
+                        }
+                    }
+
+                    applyBoardHighlights();
+
+                } else {
+                    game.undo();
+                    chessboard.position(game.fen());
+                    applyBoardHighlights();
+                    updateStatus(data.reason, 'error');
+                }
+            })
+            .catch(error => {
+                waitingForBot = false;
+                console.error('Error:', error);
+                updateStatus('Server communication error', 'error');
+            });
+        }
+
+        // =========================================================
+        //  UI Update functions
+        // =========================================================
+        function updateTurn(turn) {
+            var badge = document.getElementById('turnBadge');
+            var text = document.getElementById('turnText');
+            if (turn === 'w') {
+                text.textContent = 'Turn: White';
+                badge.className = 'turn-badge white-turn';
+            } else {
+                text.textContent = 'Turn: Black';
+                badge.className = 'turn-badge black-turn';
+            }
+        }
+
+        function updateStatus(message, type) {
+            var statusEl = document.getElementById('statusText');
+            statusEl.textContent = message;
+            statusEl.className = 'status-text status-' + type;
+        }
+
+        function addMoveToHistory(source, target) {
+            var historyEl = document.getElementById('moveHistory');
+            // Remove the initial empty message
+            var emptyMsg = historyEl.querySelector('.empty-history');
+            if (emptyMsg) emptyMsg.remove();
+
+            var moveEl = document.createElement('span');
+            moveEl.className = 'move-tag';
+            moveEl.textContent = moveCount + '. ' + source + '→' + target;
+            historyEl.appendChild(moveEl);
+
+            // Scroll to bottom
+            historyEl.scrollTop = historyEl.scrollHeight;
+        }
+
+        function showGameOver(result) {
+            var overlay = document.getElementById('gameOverOverlay');
+            var title = document.getElementById('gameOverTitle');
+            var resultEl = document.getElementById('gameOverResult');
+
+            if (result === '1-0') {
+                title.textContent = 'White Wins!';
+                resultEl.textContent = 'Checkmate! White triumphs.';
+            } else if (result === '0-1') {
+                title.textContent = 'Black Wins!';
+                resultEl.textContent = 'Checkmate! Black triumphs.';
+            } else {
+                title.textContent = 'Draw!';
+                resultEl.textContent = 'The game ended in a draw.';
+            }
+
+            overlay.classList.remove('hidden');
+        }
+
+        // =========================================================
+        //  Button actions (UNCHANGED API calls)
+        // =========================================================
+        function resetGame() {
+            fetch('/reset', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ player_color: playerColor })
+            })
+            .then(response => response.json())
+            .then(data => {
+                game.reset();
+                chessboard.start();
+                moveCount = 0;
+                selectedSquare = null;
+                lastMoveFrom = null;
+                lastMoveTo = null;
+                premoveQueue = [];
+                waitingForBot = false;
+
+                // Flip board if playing black
+                if (playerColor === 'b') {
+                    chessboard.orientation('black');
+                } else {
+                    chessboard.orientation('white');
+                }
+
+                // If bot made first move (player is black)
+                if (data.bot_move) {
+                    var botFrom = data.bot_move.substring(0, 2);
+                    var botTo = data.bot_move.substring(2, 4);
+                    var botPromo = data.bot_move.length > 4 ? data.bot_move[4] : undefined;
+                    game.move({ from: botFrom, to: botTo, promotion: botPromo });
+                    game.load(data.fen);
+                    chessboard.position(data.fen, false);
+                    moveCount++;
+                    addMoveToHistory(botFrom, botTo);
+                    lastMoveFrom = botFrom;
+                    lastMoveTo = botTo;
+                    playChessSound(false);
+                }
+
+                updateTurn(data.turn);
+                updateStatus('Game started. Make your move!', 'info');
+                document.getElementById('moveHistory').innerHTML =
+                    '<span class="empty-history">No moves yet...</span>';
+                document.getElementById('gameOverOverlay').classList.add('hidden');
+                applyBoardHighlights();
+            });
+        }
+
+        // Color picker — resets the game with the chosen color
+        function setPlayerColor(color) {
+            playerColor = color;
+            resetGame();
+        }
+
+        function undoMove() {
+            fetch('/undo', { method: 'POST' })
+            .then(response => response.json())
+            .then(data => {
+                if (data.valid) {
+                    // Sync from the server's authoritative FEN
+                    game.load(data.fen);
+                    chessboard.position(data.fen, false);
+
+                    var undone = data.undone || 1;
+                    moveCount = Math.max(0, moveCount - undone);
+                    selectedSquare = null;
+                    lastMoveFrom = null;
+                    lastMoveTo = null;
+
+                    updateTurn(data.turn);
+                    updateStatus('Move undone', 'info');
+                    applyBoardHighlights();
+
+                    // Remove history entries for each undone half-move
+                    var historyEl = document.getElementById('moveHistory');
+                    for (var i = 0; i < undone; i++) {
+                        var tags = historyEl.querySelectorAll('.move-tag');
+                        if (tags.length > 0) {
+                            tags[tags.length - 1].remove();
+                        }
+                    }
+                    if (historyEl.querySelectorAll('.move-tag').length === 0) {
+                        historyEl.innerHTML =
+                            '<span class="empty-history">No moves yet...</span>';
+                    }
+                } else {
+                    updateStatus(data.reason, 'error');
+                }
+            });
+        }
+
+        function flipBoard() {
+            chessboard.flip();
+            applyBoardHighlights();
+        }
+    </script>
+</body>
+</html>

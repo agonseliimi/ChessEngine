@@ -1,0 +1,709 @@
+/* ============================================
+   Chess Engine GUI - Clean Dark Theme
+   ============================================ */
+
+:root {
+    --bg-primary: #121215;
+    --bg-secondary: #1a1a1f;
+    --bg-card: #1e1e24;
+    --bg-card-hover: #25252c;
+    --border-color: rgba(255, 255, 255, 0.07);
+
+    --text-primary: #d4d4d8;
+    --text-secondary: #85858f;
+    --text-muted: #55555f;
+
+    --accent: #7a7a8a;
+    --accent-soft: rgba(122, 122, 138, 0.12);
+    --accent-green: #6b9b7a;
+    --accent-green-soft: rgba(107, 155, 122, 0.12);
+    --accent-red: #b06060;
+    --accent-red-soft: rgba(176, 96, 96, 0.12);
+    --accent-amber: #b09a60;
+    --accent-amber-soft: rgba(176, 154, 96, 0.12);
+
+    /* Highlight colors for last move & selection */
+    --highlight-lastmove: rgba(172, 162, 72, 0.35);
+    --highlight-selected: rgba(120, 160, 220, 0.45);
+    --legal-dot-color: rgba(128, 128, 128, 0.55);
+    --legal-dot-capture: rgba(128, 128, 128, 0.35);
+
+    --radius: 10px;
+    --radius-sm: 6px;
+    --shadow-lg: 0 4px 20px rgba(0, 0, 0, 0.3);
+
+    --transition: 0.2s ease;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    min-height: 100vh;
+    overflow-x: hidden;
+}
+
+/* ============================================
+   Layout
+   ============================================ */
+
+.app-container {
+    position: relative;
+    z-index: 1;
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 20px 24px 40px;
+}
+
+/* ============================================
+   Header
+   ============================================ */
+
+.header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 0 24px;
+}
+
+.logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.logo-icon {
+    font-size: 24px;
+    opacity: 0.7;
+}
+
+.logo h1 {
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--text-primary);
+    letter-spacing: -0.02em;
+}
+
+.turn-badge {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 14px;
+    border-radius: 100px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    transition: var(--transition);
+}
+
+.turn-badge.white-turn {
+    border-color: rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.turn-badge.black-turn {
+    border-color: rgba(255, 255, 255, 0.08);
+    background: var(--bg-card);
+}
+
+.turn-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--accent-green);
+    animation: pulse 2.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.4;
+    }
+}
+
+/* ============================================
+   Main Content Grid
+   ============================================ */
+
+.main-content {
+    display: grid;
+    grid-template-columns: auto 300px;
+    gap: 24px;
+    align-items: start;
+}
+
+/* ============================================
+   Chess Board
+   ============================================ */
+
+.board-wrapper {
+    position: relative;
+    width: 520px;
+    justify-self: end;
+}
+
+.board-inner {
+    border-radius: var(--radius);
+    overflow: hidden;
+    box-shadow: var(--shadow-lg);
+    border: 1px solid var(--border-color);
+}
+
+/* Chessboard.js overrides for dark theme */
+.board-inner .square-55d63 {
+    transition: background-color 0.15s ease;
+    position: relative;
+}
+
+/* Light squares */
+.board-inner .white-1e1d7 {
+    background-color: #3a3a42 !important;
+    color: #6a6a74 !important;
+}
+
+/* Dark squares */
+.board-inner .black-3c85d {
+    background-color: #28282e !important;
+    color: #4a4a54 !important;
+}
+
+/* Highlight on hover */
+.board-inner .square-55d63.highlight-square {
+    background-color: rgba(140, 140, 160, 0.3) !important;
+}
+
+/* ============================================
+   Last Move Highlight (yellow/green overlay)
+   ============================================ */
+
+.board-inner .square-55d63.highlight-lastmove-from,
+.board-inner .square-55d63.highlight-lastmove-to {
+    background-color: var(--highlight-lastmove) !important;
+}
+
+/* Light squares with last-move highlight */
+.board-inner .white-1e1d7.highlight-lastmove-from,
+.board-inner .white-1e1d7.highlight-lastmove-to {
+    background-color: rgba(172, 162, 72, 0.45) !important;
+}
+
+/* Dark squares with last-move highlight */
+.board-inner .black-3c85d.highlight-lastmove-from,
+.board-inner .black-3c85d.highlight-lastmove-to {
+    background-color: rgba(152, 142, 52, 0.40) !important;
+}
+
+/* ============================================
+   Selected Square Highlight
+   ============================================ */
+
+.board-inner .square-55d63.highlight-selected {
+    background-color: var(--highlight-selected) !important;
+}
+
+.board-inner .white-1e1d7.highlight-selected {
+    background-color: rgba(120, 160, 220, 0.50) !important;
+}
+
+.board-inner .black-3c85d.highlight-selected {
+    background-color: rgba(100, 140, 200, 0.45) !important;
+}
+
+/* ============================================
+   Premove Highlight (red overlay)
+   ============================================ */
+
+.board-inner .square-55d63.highlight-premove-from,
+.board-inner .square-55d63.highlight-premove-to {
+    background-color: rgba(180, 60, 60, 0.45) !important;
+}
+
+.board-inner .white-1e1d7.highlight-premove-from,
+.board-inner .white-1e1d7.highlight-premove-to {
+    background-color: rgba(190, 65, 65, 0.50) !important;
+}
+
+.board-inner .black-3c85d.highlight-premove-from,
+.board-inner .black-3c85d.highlight-premove-to {
+    background-color: rgba(160, 50, 50, 0.50) !important;
+}
+
+/* ============================================
+   Legal Move Dots
+   ============================================ */
+
+.legal-dot {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 28%;
+    height: 28%;
+    border-radius: 50%;
+    background: var(--legal-dot-color);
+    pointer-events: none;
+    z-index: 10;
+    animation: dotFadeIn 0.15s ease;
+}
+
+/* Capture indicator — ring on occupied squares */
+.legal-dot.legal-dot-capture {
+    width: 85%;
+    height: 85%;
+    background: transparent;
+    border: 5px solid var(--legal-dot-capture);
+    border-radius: 50%;
+}
+
+@keyframes dotFadeIn {
+    from {
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(0.4);
+    }
+
+    to {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1);
+    }
+}
+
+/* ============================================
+   Dragged piece cursor style
+   ============================================ */
+
+.board-inner .square-55d63 {
+    cursor: pointer;
+}
+
+/* ============================================
+   Cards (Side Panel)
+   ============================================ */
+
+.side-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    padding: 18px;
+    transition: var(--transition);
+}
+
+.card:hover {
+    background: var(--bg-card-hover);
+}
+
+.card h3 {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+    margin-bottom: 12px;
+}
+
+/* ============================================
+   Status Card
+   ============================================ */
+
+.status-text {
+    font-size: 13px;
+    font-weight: 500;
+    padding: 9px 12px;
+    border-radius: var(--radius-sm);
+    background: rgba(255, 255, 255, 0.03);
+    border-left: 3px solid var(--accent);
+    color: var(--text-secondary);
+    transition: var(--transition);
+}
+
+.status-success {
+    border-left-color: var(--accent-green);
+    background: var(--accent-green-soft);
+    color: var(--accent-green);
+}
+
+.status-error {
+    border-left-color: var(--accent-red);
+    background: var(--accent-red-soft);
+    color: var(--accent-red);
+}
+
+.status-warning {
+    border-left-color: var(--accent-amber);
+    background: var(--accent-amber-soft);
+    color: var(--accent-amber);
+}
+
+.status-info {
+    border-left-color: var(--accent);
+    color: var(--text-secondary);
+}
+
+/* ============================================
+   Move History
+   ============================================ */
+
+.move-history {
+    max-height: 150px;
+    overflow-y: auto;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    padding-right: 4px;
+}
+
+/* Custom scrollbar */
+.move-history::-webkit-scrollbar {
+    width: 3px;
+}
+
+.move-history::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.move-history::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 100px;
+}
+
+.move-tag {
+    display: inline-block;
+    padding: 3px 8px;
+    background: var(--accent-soft);
+    color: var(--text-secondary);
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 500;
+    font-family: 'Inter', monospace;
+    letter-spacing: 0.02em;
+    animation: fadeIn 0.2s ease;
+}
+
+.empty-history {
+    font-size: 12px;
+    color: var(--text-muted);
+    font-style: italic;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(3px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* ============================================
+   Buttons
+   ============================================ */
+
+.button-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 10px 16px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    font-family: 'Inter', sans-serif;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: var(--transition);
+    background: var(--bg-card);
+    color: var(--text-secondary);
+}
+
+.btn:hover {
+    background: var(--bg-card-hover);
+    color: var(--text-primary);
+}
+
+.btn:active {
+    transform: scale(0.98);
+}
+
+.btn-secondary {
+    background: var(--bg-card);
+    border-color: var(--border-color);
+}
+
+.btn-secondary:hover {
+    background: var(--bg-card-hover);
+}
+
+.btn-danger {
+    background: var(--accent-red-soft);
+    border-color: rgba(176, 96, 96, 0.15);
+    color: var(--accent-red);
+}
+
+.btn-danger:hover {
+    background: rgba(176, 96, 96, 0.18);
+}
+
+.btn-accent {
+    background: var(--accent-soft);
+    border-color: rgba(122, 122, 138, 0.15);
+    color: var(--text-secondary);
+}
+
+.btn-accent:hover {
+    background: rgba(122, 122, 138, 0.18);
+}
+
+.btn-primary {
+    background: var(--bg-card-hover);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: var(--text-primary);
+    font-size: 13px;
+    font-weight: 600;
+    padding: 12px 24px;
+}
+
+.btn-primary:hover {
+    background: rgba(255, 255, 255, 0.08);
+}
+
+/* ============================================
+   Game Over Overlay
+   ============================================ */
+
+.overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.75);
+    backdrop-filter: blur(8px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    animation: overlayIn 0.3s ease;
+}
+
+.overlay.hidden {
+    display: none;
+}
+
+@keyframes overlayIn {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+.overlay-content {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 14px;
+    padding: 40px;
+    text-align: center;
+    box-shadow: var(--shadow-lg);
+    animation: popIn 0.3s ease;
+}
+
+@keyframes popIn {
+    from {
+        opacity: 0;
+        transform: scale(0.95);
+    }
+
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+.overlay-content h2 {
+    font-size: 22px;
+    font-weight: 700;
+    margin-bottom: 8px;
+    color: var(--text-primary);
+}
+
+.overlay-content p {
+    color: var(--text-secondary);
+    margin-bottom: 20px;
+    font-size: 14px;
+}
+
+/* ============================================
+   Bot Trash Talk Bubble
+   ============================================ */
+
+.trash-talk-bubble {
+    position: absolute;
+    top: 30px;
+    right: calc(100% + 24px);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 18px;
+    background: rgba(40, 40, 48, 0.95);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 14px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+    z-index: 500;
+    pointer-events: none;
+    width: max-content;
+    max-width: 280px;
+    transform-origin: right center;
+}
+
+/* Speech bubble tail pointing right to the board edge */
+.trash-talk-bubble::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    right: -24px;
+    border-width: 14px 0 14px 24px;
+    border-style: solid;
+    border-color: transparent transparent transparent rgba(40, 40, 48, 0.95);
+}
+
+.trash-talk-bubble.hidden {
+    display: none;
+}
+
+.trash-talk-avatar {
+    font-size: 26px;
+    flex-shrink: 0;
+    opacity: 0.9;
+}
+
+.trash-talk-text {
+    font-family: 'Inter', sans-serif;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-primary);
+    line-height: 1.4;
+}
+
+/* Animations */
+.trash-talk-bubble.trash-talk-in {
+    animation: trashTalkIn 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+.trash-talk-bubble.trash-talk-out {
+    animation: trashTalkOut 0.4s ease forwards;
+}
+
+@keyframes trashTalkIn {
+    from {
+        opacity: 0;
+        transform: scale(0.8) translateX(-15px);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1) translateX(0);
+    }
+}
+
+@keyframes trashTalkOut {
+    from {
+        opacity: 1;
+        transform: scale(1) translateX(0);
+    }
+    to {
+        opacity: 0;
+        transform: scale(0.9) translateX(-15px);
+    }
+}
+
+/* ============================================
+   Responsive
+   ============================================ */
+
+@media (max-width: 920px) {
+    .main-content {
+        grid-template-columns: 1fr;
+        justify-items: center;
+    }
+
+    .board-wrapper {
+        width: min(520px, 90vw);
+        justify-self: center;
+    }
+
+    .side-panel {
+        width: 100%;
+        max-width: 520px;
+    }
+
+    /* Move bubble above board on small screens */
+    .trash-talk-bubble {
+        top: -70px;
+        left: 0;
+        right: auto;
+        transform-origin: bottom left;
+    }
+
+    .trash-talk-bubble::after {
+        top: auto;
+        bottom: -16px;
+        left: 20px;
+        right: auto;
+        transform: none;
+        border-width: 16px 12px 0 12px;
+        border-color: rgba(40, 40, 48, 0.95) transparent transparent transparent;
+    }
+}
+
+@media (max-width: 500px) {
+    .app-container {
+        padding: 12px 16px 32px;
+    }
+
+    .header {
+        flex-direction: column;
+        gap: 12px;
+        text-align: center;
+    }
+
+    .board-wrapper {
+        width: 95vw;
+    }
+
+    .button-group {
+        flex-direction: row;
+        flex-wrap: wrap;
+    }
+
+    .btn {
+        flex: 1;
+        min-width: 90px;
+    }
+}
