@@ -1,9 +1,9 @@
 import chess
-from evaluation import evaluateBoard, valueOfPiece
+from searchUtils import quiescence, movesOrder
 
 
 transposition_table = {}
-
+# This function computes the score assuming that both White and Black play the best moves
 def alphaBeta(board: chess.Board, depth: int, alpha: int, beta: int, maximizing_player: bool):
     # Transposition Table Lookup
     board_hash = board._transposition_key()
@@ -32,10 +32,12 @@ def alphaBeta(board: chess.Board, depth: int, alpha: int, beta: int, maximizing_
         return quiescence(board, alpha, beta, maximizing_player)
         
     legalMoves = list(board.legal_moves)
+    # Alpha is the best score of the moves for White
     original_alpha = alpha
+    # Beta is the bes score of the moves for Black
     original_beta = beta
 
-    if maximizing_player:
+    if maximizing_player: # White
         max_eval = -9999
         for move in movesOrder(legalMoves, board):
             board.push(move)
@@ -56,7 +58,7 @@ def alphaBeta(board: chess.Board, depth: int, alpha: int, beta: int, maximizing_
         transposition_table[board_hash] = (depth, max_eval, flag)
         
         return max_eval
-    else:
+    else: #Black
         min_eval = 9999
         for move in movesOrder(legalMoves, board):
             board.push(move)
@@ -78,7 +80,7 @@ def alphaBeta(board: chess.Board, depth: int, alpha: int, beta: int, maximizing_
         
         return min_eval
 
-
+# This function allows the bot to choose the best move using the alphaBeta algorithm to evaluate moves
 def getBestMove(board: chess.Board, depth: int):
     transposition_table.clear()  # Prevent memory bloat across turns
     bestMove = None
@@ -117,60 +119,4 @@ def getBestMove(board: chess.Board, depth: int):
         return bestMove.uci()
     return None
      
-def movesOrder(moves: list[chess.Move], board: chess.Board)-> list[chess.Move]:
-    scoredMoves = []
-    
-    for move in moves:
-        score = 0
-        
-        victimPiace = board.piece_type_at(move.to_square)
-        if victimPiace is not None:
-            attackPiace = board.piece_type_at(move.from_square)
-            # Prioritise capturing opponent's most valuable pieces with our least valuable pieces
-            score = 10 * valueOfPiece[victimPiace] - valueOfPiece[attackPiace]
-        
-        # Promoting a pawn is likely to be good
-        if move.promotion:
-            score += valueOfPiece[move.promotion]
-            
-        scoredMoves.append((score, move))
 
-    scoredMoves.sort(key=lambda x: x[0], reverse=True)
-    return [x[1] for x in scoredMoves]
-
-def quiescence(board: chess.Board, alpha: int, beta: int, maximizingPlayer: bool, q_depth: int = 0) -> int:
-    """Quiescence search vetëm kapjet për të stabilizuar vlerësimin."""
-    # Stand-pat (vlerësimi i pozicionit aktual pa lëvizje)
-    stand_pat = evaluateBoard(board)
-
-    # Hard limit on quiescence depth to prevent infinite explosion in open positions
-    if q_depth > 4:
-        return stand_pat
-
-    if maximizingPlayer:
-        if stand_pat >= beta:
-            return beta
-        alpha = max(alpha, stand_pat)
-    else:
-        if stand_pat <= alpha:
-            return alpha
-        beta = min(beta, stand_pat)
-
-    # Vetëm kapjet (gjenerim i shpejtë pa legal_moves të plota)
-    captures = list(board.generate_legal_captures())
-    
-    for move in movesOrder(captures, board):
-        board.push(move)
-        score = quiescence(board, alpha, beta, not maximizingPlayer, q_depth + 1)
-        board.pop()
-
-        if maximizingPlayer:
-            if score >= beta:
-                return beta
-            alpha = max(alpha, score)
-        else:
-            if score <= alpha:
-                return alpha
-            beta = min(beta, score)
-
-    return alpha if maximizingPlayer else beta
